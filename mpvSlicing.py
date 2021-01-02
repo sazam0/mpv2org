@@ -95,10 +95,17 @@ def ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList):
     return 0
 
 def clearCmd(thrd,fileDir,cmdList,archFile):
-    template=re.compile("\-i\s.*mp4\s")
+
+    ipTemplate=re.compile("\-i\s.*mp4\s")
+    opTemplate=re.compile("\s/home/.*(?:mp4|jpg|png)")
 
     log="\n\n["+str(datetime.now().strftime("%d/%m/%Y_%H:%M:%S"))+"]\n\n"
-    relativePath=lambda x: template.sub("-i {input}/"+template.findall(x)[0].split('/')[-1],x)
+
+    ipRelativePath=lambda x: ipTemplate.sub("-i {input}/"+ipTemplate.findall(x)[0].split('/')[-1],x)
+    opRelativePath=lambda x: opTemplate.sub("{output}/"+opTemplate.findall(x)[0].split('/')[-1],x)
+
+    relativePath=lambda x: opRelativePath(ipRelativePath(x)) if (opTemplate.search(ipRelativePath(x))!= None) else ipRelativePath(x)
+
 
     fileIO(fromFile=fileDir+"/{arch}".format(arch=archFile),mode='a',
         txt=log+'\n'.join(map(relativePath,thrd.executedList())))
@@ -111,6 +118,15 @@ def clearCmd(thrd,fileDir,cmdList,archFile):
 
     return 0
 
+def formatCmd(ipDir,opDir,cmdTxt):
+    if("{input}" in cmdTxt):
+        cmdTxt=cmdTxt.format(input=ipDir)
+    if("{output}" in cmdTxt):
+        cmdTxt=cmdTxt.format(output=opDir)
+
+    return cmdTxt
+
+
 def formatDir(txt):
     if(txt.startswith("~/")):
         txt='/'.join([str(Path.home()),txt[2:]])
@@ -121,7 +137,7 @@ def formatDir(txt):
 
     return txt
 
-def initialize(gpu,nthreads,fileDir,opDir,cmdList):
+def initialize(gpu,nthreads,fileDir,ipDir,opDir,cmdList):
     fromImgFile=cmdList['img']
     if(gpu):
         fromVidFile=cmdList['gpu']
@@ -135,10 +151,16 @@ def initialize(gpu,nthreads,fileDir,opDir,cmdList):
         print("Executing on cpu")
 
     fileDir=formatDir(fileDir)
-    opDir=formatDir(opDir)
+    # opDir=formatDir(opDir)
+    # ipDir=formatDir(ipDir)
 
-    vidCmdList=[i.format(output=opDir)  for i in fileIO(fromFile='/'.join([fileDir,fromVidFile]),mode='r',txt='')]
-    imgCmdList=[i.format(output=opDir)  for i in fileIO(fromFile='/'.join([fileDir,fromImgFile]),mode='r',txt='')]
+    partialFormatCmd=partial(formatCmd,ipDir=formatDir(ipDir),opDir=formatDir(opDir))
+
+    vidCmdList=list(map(partialFormatCmd,fileIO(fromFile='/'.join([fileDir,fromVidFile]),mode='r',txt='')))
+    imgCmdList=list(map(partialFormatCmd,fileIO(fromFile='/'.join([fileDir,fromImgFile]),mode='r',txt='')))
+
+    # vidCmdList=[i.format(output=opDir)  for i in fileIO(fromFile='/'.join([fileDir,fromVidFile]),mode='r',txt='')]
+    # imgCmdList=[i.format(output=opDir)  for i in fileIO(fromFile='/'.join([fileDir,fromImgFile]),mode='r',txt='')]
 
     return [nthreads,vidCmdList,imgCmdList,fileDir]
 
@@ -159,6 +181,8 @@ def check_cuda_version():
 def parseArgs(cmdList):
     parser=argparse.ArgumentParser()
 
+    parser.add_argument('--ip', '-i',type=str,default=config('ip'), metavar='[dir]',
+        help="input directory for mpv generated files for ffmpeg extraction")
     parser.add_argument('--op', '-o',type=str,default=config('op'), metavar='[dir]',
         help="output directory for ffmpeg generated sliced files")
     parser.add_argument('--file', '-f',type=str, default=config('file'), metavar='[dir]',
@@ -192,7 +216,7 @@ def main():
     gpu=check_cuda_version()
 
     nthreads,vidCmdList,imgCmdList,fileDir=initialize(gpu=gpu,nthreads=inputs.nthreads,
-        fileDir=inputs.file,opDir=inputs.op,cmdList=cmdList,)
+        fileDir=inputs.file,ipDir=inputs.ip,opDir=inputs.op,cmdList=cmdList,)
 
     thrd=MyThread(nthreads)
     ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList)
