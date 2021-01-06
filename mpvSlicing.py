@@ -120,10 +120,15 @@ def clearCmd(thrd,fileDir,cmdList,archFile):
 
 def formatCmd(cmdTxt, ipDir, opDir):
     if("{input}" in cmdTxt):
+        print("'input' directory not assigned in 'ffmpeg' command, setting directory to: {ipDir}".format(ipDir=ipDir))
         cmdTxt=cmdTxt.format(input=ipDir)
+    else:
+        print("'input' directory is already assigned in 'ffmpeg' command")
     if("{output}" in cmdTxt):
+        print("'output' directory not assigned in 'ffmpeg' command, setting directory to: {opDir}".format(opDir=opDir))
         cmdTxt=cmdTxt.format(output=opDir)
-
+    else:
+        print("'output' directory is already assigned in 'ffmpeg' command")
     return cmdTxt
 
 
@@ -137,7 +142,7 @@ def formatDir(txt):
 
     return txt
 
-def initialize(gpu,nthreads,fileDir,ipDir,opDir,cmdList):
+def initialize(gpu,nthreads,fileDir,ipDir,opDir,cmdList,archFile,archCmd):
     fromImgFile=cmdList['img']
     if(gpu):
         fromVidFile=cmdList['gpu']
@@ -154,10 +159,16 @@ def initialize(gpu,nthreads,fileDir,ipDir,opDir,cmdList):
     # opDir=formatDir(opDir)
     # ipDir=formatDir(ipDir)
 
+    if(archCmd != "-1"):
+        tmpVidCmd,tmpImgCmd=parseArch(archCmd,archFile,fileDir)
+    else:
+        tmpVidCmd=fileIO(fromFile='/'.join([fileDir,fromVidFile]),mode='r',txt='')
+        tmpImgCmd=fileIO(fromFile='/'.join([fileDir,fromImgFile]),mode='r',txt='')
+
     partialFormatCmd=partial(formatCmd,ipDir=formatDir(ipDir),opDir=formatDir(opDir))
 
-    vidCmdList=list(map(partialFormatCmd,fileIO(fromFile='/'.join([fileDir,fromVidFile]),mode='r',txt='')))
-    imgCmdList=list(map(partialFormatCmd,fileIO(fromFile='/'.join([fileDir,fromImgFile]),mode='r',txt='')))
+    vidCmdList=list(map(partialFormatCmd,tmpVidCmd))
+    imgCmdList=list(map(partialFormatCmd,tmpImgCmd))
 
     # vidCmdList=[i.format(output=opDir)  for i in fileIO(fromFile='/'.join([fileDir,fromVidFile]),mode='r',txt='')]
     # imgCmdList=[i.format(output=opDir)  for i in fileIO(fromFile='/'.join([fileDir,fromImgFile]),mode='r',txt='')]
@@ -177,10 +188,40 @@ def check_cuda_version():
         pass
     return flag
 
+def parseArch(archCmd,archFile,fileDir):
+    splitFormat=re.compile("\[\d\d\/\d\d\/\d\d\d\d\_\d\d:\d\d:\d\d\]\n")
+    tagFormat=re.compile("\[\d\d\/\d\d\/\d\d\d\d\_\d\d:\d\d:\d\d\]")
+    imgFormat=re.compile("\.(?:jpg|png)")
+
+    if(not archCmd.startswith("[")):
+        archCmd="["+archCmd
+    if(not archCmd.endswith("]")):
+        archCmd+="]"
+
+    if(tagFormat.match(archCmd) != None):
+        pass
+    else:
+        print("'archieve' command do not follow the specified format")
+        exit()
+
+    tmp=fileIO(fromFile=fileDir+"/{arch}".format(arch=archFile),mode='r',txt='')
+    tmp=''.join(tmp)
+    splitted=tmp.split(archCmd)[1]
+    splitted=splitFormat.split(splitted)[0].split('\n')
+
+    tmpVidCmd=[]
+    tmpImgCmd=[]
+    skipBlankLines=lambda x: tmpImgCmd.append(x) if(imgFormat.search(x)!= None) else tmpVidCmd.append(x)
+
+    _=list(map(skipBlankLines,[i for i in splitted if(len(i.strip())>1)]))
+
+    return [tmpVidCmd,tmpImgCmd]
 
 def parseArgs(cmdList):
     parser=argparse.ArgumentParser()
 
+    parser.add_argument('--arch', '-a', type=str,default='-1',metavar='dd/mm/yyyy_hh/mm/ss',
+        help="if set, the commands from matched tag from archieve file will be executed")
     parser.add_argument('--ip', '-i',type=str,default=config('ip'), metavar='[dir]',
         help="input directory for mpv generated files for ffmpeg extraction")
     parser.add_argument('--op', '-o',type=str,default=config('op'), metavar='[dir]',
@@ -216,7 +257,8 @@ def main():
     gpu=check_cuda_version()
 
     nthreads,vidCmdList,imgCmdList,fileDir=initialize(gpu=gpu,nthreads=inputs.nthreads,
-        fileDir=inputs.file,ipDir=inputs.ip,opDir=inputs.op,cmdList=cmdList)
+        fileDir=inputs.file,ipDir=inputs.ip,opDir=inputs.op,cmdList=cmdList,
+        archFile=archFile,archCmd=inputs.arch)
 
     thrd=MyThread(nthreads)
     ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList)
