@@ -92,7 +92,7 @@ def ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList):
 
     print("All done")
 
-    # return 0
+    return 0
 
 def clearCmd(thrd,fileDir,cmdList,archFile):
 
