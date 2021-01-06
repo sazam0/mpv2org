@@ -92,20 +92,19 @@ def ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList):
 
     print("All done")
 
-    return 0
+    # return 0
 
 def clearCmd(thrd,fileDir,cmdList,archFile):
 
-    ipTemplate=re.compile("\-i\s.*mp4\s")
+    ipTemplate=re.compile("\-i\s.*mp4\s-")
     opTemplate=re.compile("\s/home/.*(?:mp4|jpg|png)")
 
     log="\n\n["+str(datetime.now().strftime("%d/%m/%Y_%H:%M:%S"))+"]\n\n"
 
     ipRelativePath=lambda x: ipTemplate.sub("-i {input}/"+ipTemplate.findall(x)[0].split('/')[-1],x)
-    opRelativePath=lambda x: opTemplate.sub("{output}/"+opTemplate.findall(x)[0].split('/')[-1],x)
+    opRelativePath=lambda x: opTemplate.sub(" {output}/"+opTemplate.findall(x)[0].split('/')[-1],x)
 
     relativePath=lambda x: opRelativePath(ipRelativePath(x)) if (opTemplate.search(ipRelativePath(x))!= None) else ipRelativePath(x)
-
 
     fileIO(fromFile=fileDir+"/{arch}".format(arch=archFile),mode='a',
         txt=log+'\n'.join(map(relativePath,thrd.executedList())))
@@ -118,7 +117,8 @@ def clearCmd(thrd,fileDir,cmdList,archFile):
 
     return 0
 
-def formatCmd(ipDir,opDir,cmdTxt):
+
+def formatCmd(cmdTxt, ipDir, opDir):
     if("{input}" in cmdTxt):
         cmdTxt=cmdTxt.format(input=ipDir)
     if("{output}" in cmdTxt):
@@ -216,7 +216,7 @@ def main():
     gpu=check_cuda_version()
 
     nthreads,vidCmdList,imgCmdList,fileDir=initialize(gpu=gpu,nthreads=inputs.nthreads,
-        fileDir=inputs.file,ipDir=inputs.ip,opDir=inputs.op,cmdList=cmdList,)
+        fileDir=inputs.file,ipDir=inputs.ip,opDir=inputs.op,cmdList=cmdList)
 
     thrd=MyThread(nthreads)
     ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList)
