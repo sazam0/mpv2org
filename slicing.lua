@@ -24,10 +24,10 @@ local o = {
     ]],
     gpuCommandTemplate=[[
         ffmpeg -v warning -y -stats
-        -vsync 0 -hwaccel cuvid -hwaccel_output_format cuda 
+        -vsync 0 -hwaccel cuvid -hwaccel_output_format cuda
         -ss $shift -c:v h264_cuvid -i $in
         -c:v h264_nvenc $bv $acodec
-        -t $duration $out.$ext 
+        -t $duration $out.$ext
     ]],
     imgCommandTemplate=[[
         ffmpeg -v warning -y -stats
@@ -39,17 +39,17 @@ local o = {
 local emacsParam={
     protocol="org-protocol",
     template="ab",
-    quickImg_template="ac",
-    url="",
+    img_template="ac",
+    url="$filetype:../../../noteVideo/$outname",
     title="",
     body=""
-}    
+}
 
 options.read_options(o)
 
 function menu_set_time(field)
     local time,err = mp.get_property_number("time-pos")
-    
+
     if time == nil or time == ctx[field] then
         ctx[field] = -1
         osd("Failed to get timestamp")
@@ -118,15 +118,15 @@ function get_outname(shift, endpos)
     name = name:gsub(":", "-")
     name = name:gsub("_","--")
     if endpos ~= -1 then
-        name = name .. string.format("::%s-%s", timestamp(shift), timestamp(endpos))
+        name = name .. string.format(":-:%s-%s", timestamp(shift), timestamp(endpos))
     else
-        name = name .. string.format("::%s", timestamp(shift))
+        name = name .. string.format(":-:%s", timestamp(shift))
     end
         return name
 end
 
 function command_writer(filename, input_string)
-    
+
 	local file_object = io.open(filename, 'a')
 
 	if file_object == nil then
@@ -139,23 +139,22 @@ function command_writer(filename, input_string)
 end
 
 
-function emacs(outname,vidFlag,quickFlag)
-local ext='' 
+function emacs(outname,vidFlag)
+local ext=''
 local template=''
+local filetype=''
 if vidFlag == 1  then
 	ext = o.ext -- video file
+  filetype="mpv"
+    template=emacsParam.template
 else
 	ext = o.imgExt -- img file
+  filetype="img"
+    template=emacsParam.img_template
 end
 
-if(quickFlag) then
-    template=emacsParam.quickImg_template
-else
-    template=emacsParam.template
-end
-
-
-emacsParam.url=outname.."."..ext
+emacsParam.url=emacsParam.url:gsub("$filetype",filetype)
+emacsParam.url=emacsParam.url:gsub("$outname",outname.."."..ext)
 emacsParam.title="from anki notes"
 emacsParam.body=outname.."."..ext
 
@@ -181,7 +180,7 @@ end
 function cut(shift, endpos)
     local cpuCmd = trim(o.cpuCommandTemplate:gsub("%s+", " "))
     local gpuCmd = trim(o.gpuCommandTemplate:gsub("%s+", " "))
-    
+
     local outname=get_outname(shift, endpos)
 
     -- local inpath = "{input}/" .. mp.get_property("stream-path")
@@ -213,8 +212,8 @@ function cut(shift, endpos)
 
     msg.info(string.format("Cut fragment: %s-%s", timestamp(shift), timestamp(endpos)))
     osd(string.format("Cut fragment: %s-%s", timestamp(shift), timestamp(endpos)))
-    
-    emacs(outname,1,false)
+
+    emacs(outname,1)
     -- msg.info(cpuCmd)
     -- log(cpuCmd)
     -- print("start :: " .. shift)
@@ -238,25 +237,26 @@ function snapshot(quickFlag)
 
     local inpath=string.format("%s/%s",mp.get_property("working-directory"),
                         mp.get_property("path"))
-    if (quickFlag) then
-        outpath = escape(utils.join_path(o.quickImg_dir,outname))
-    else    
-        outpath = escape(utils.join_path(o.target_dir,outname))
-    end
+    outpath = escape(utils.join_path(o.target_dir,outname))
+
 
     imgCmd = imgCmd:gsub("$shift",timestamp(ctx.snapshot_time))
     imgCmd = imgCmd:gsub("$ext", o.imgExt)
-    imgCmd = imgCmd:gsub("$out", outpath)
     imgCmd = imgCmd:gsub("$in", inpath)
 
-    if(not quickFlag) then
-        mp.register_script_message("write_to_file",
-        command_writer(get_homedir().."/imgList.dat",imgCmd))
-    else
-        -- msg.info(imgCmd)
-        os.execute(imgCmd)
+    if (quickFlag) then
+      local quickImgCmd = imgCmd
+      local quickOutPath = escape(utils.join_path(o.quickImg_dir,outname))
+      quickImgCmd = quickImgCmd:gsub("$out", quickOutPath)
+      -- msg.info(imgCmd)
+      os.execute(quickImgCmd)
     end
-    emacs(outname,0,quickFlag)
+
+    imgCmd = imgCmd:gsub("$out", outpath)
+    mp.register_script_message("write_to_file",
+        command_writer(get_homedir().."/imgList.dat",imgCmd))
+
+    emacs(outname,0)
 end
 
 

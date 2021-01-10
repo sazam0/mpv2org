@@ -119,16 +119,26 @@ def clearCmd(thrd,fileDir,cmdList,archFile):
 
 
 def formatCmd(cmdTxt, ipDir, opDir):
-    if("{input}" in cmdTxt):
-        print("'input' directory not assigned in 'ffmpeg' command, setting directory to: {ipDir}".format(ipDir=ipDir))
-        cmdTxt=cmdTxt.format(input=ipDir)
+    ipDirFlag=cmdTxt.find("{input}") != -1
+    opDirFlag=cmdTxt.find("{output}") != -1
+
+    if(ipDirFlag and opDirFlag):
+        print("'input' and 'output' directory not assigned in 'ffmpeg' command, setting\n"\
+        "input directory to: {ipDir} and\noutput directory to: {opDir}".format(ipDir=ipDir,opDir=opDir))
+        cmdTxt=cmdTxt.format(input=ipDir,output=opDir)
     else:
-        print("'input' directory is already assigned in 'ffmpeg' command")
-    if("{output}" in cmdTxt):
-        print("'output' directory not assigned in 'ffmpeg' command, setting directory to: {opDir}".format(opDir=opDir))
-        cmdTxt=cmdTxt.format(output=opDir)
-    else:
-        print("'output' directory is already assigned in 'ffmpeg' command")
+        if(ipDirFlag):
+            print("'input' directory not assigned in 'ffmpeg' command, setting directory to: {ipDir}".format(ipDir=ipDir))
+            cmdTxt=cmdTxt.format(input=ipDir)
+        else:
+            print("'input' directory is already assigned in 'ffmpeg' command")
+        if(opDirFlag):
+            print("'output' directory not assigned in 'ffmpeg' command, setting directory to: {opDir}".format(opDir=opDir))
+            cmdTxt=cmdTxt.format(output=opDir)
+        else:
+            print("'output' directory is already assigned in 'ffmpeg' command")
+
+    print(cmdTxt)
     return cmdTxt
 
 
@@ -165,6 +175,7 @@ def initialize(gpu,nthreads,fileDir,ipDir,opDir,cmdList,archFile,archCmd):
         tmpVidCmd=fileIO(fromFile='/'.join([fileDir,fromVidFile]),mode='r',txt='')
         tmpImgCmd=fileIO(fromFile='/'.join([fileDir,fromImgFile]),mode='r',txt='')
 
+    print("following commands to be executed: ")
     partialFormatCmd=partial(formatCmd,ipDir=formatDir(ipDir),opDir=formatDir(opDir))
 
     vidCmdList=list(map(partialFormatCmd,tmpVidCmd))
