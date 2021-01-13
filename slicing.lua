@@ -8,7 +8,8 @@ local ctx = {
     end_time = -1
 }
 local o = {
-    quickImg_dir = os.getenv("HOME").."/Dropbox/quickImg/",
+    datFiles_dir= os.getenv("HOME").."/opt/mpvSlicingList",
+    quickImg_dir = os.getenv("HOME").."/Nextcloud/quickImg/",
     target_dir = "{output}/",
     vcodec = "-c:v libx264", --  -crf 35
     acodec = "-c:a copy -b:a 256k",
@@ -40,7 +41,7 @@ local emacsParam={
     protocol="org-protocol",
     template="ab",
     img_template="ac",
-    url="$filetype:../../../noteVideo/$outname",
+    url="",
     title="",
     body=""
 }
@@ -71,15 +72,15 @@ function osd(str)
     return mp.osd_message(str, 3)
 end
 
-function get_homedir()
-  -- It would be better to do platform detection instead of fallback but
-  -- it's not that easy in Lua.
-  -- return os.getenv("HOME") or os.getenv("USERPROFILE") or ""
-  return os.getenv("HOME").."/opt/mpvSlicingList"
-end
+-- function get_homedir()
+--   -- It would be better to do platform detection instead of fallback but
+--   -- it's not that easy in Lua.
+--   -- return os.getenv("HOME") or os.getenv("USERPROFILE") or ""
+--   return os.getenv("HOME").."/opt/mpvSlicingList"
+-- end
 
 function log(str)
-    local logpath = utils.join_path(get_homedir(),"/log/mpv_slicing.log")
+    local logpath = utils.join_path(o.datFiles_dir,"/log/mpv_slicing.log")
     f = io.open(logpath, "a")
     f:write(string.format("# %s\n%s\n",
         os.date("%Y-%m-%d %H:%M:%S"),
@@ -153,10 +154,9 @@ else
     template=emacsParam.img_template
 end
 
-emacsParam.url=emacsParam.url:gsub("$filetype",filetype)
-emacsParam.url=emacsParam.url:gsub("$outname",outname.."."..ext)
-emacsParam.title="from anki notes"
+emacsParam.url=outname.."."..ext
 emacsParam.body=outname.."."..ext
+emacsParam.title="from anki notes"
 
 local emacsCmd=[[
     "$protocol://capture?
@@ -221,10 +221,10 @@ function cut(shift, endpos)
     -- print(cpuCmd)
     -- os.execute(cpuCmd)
     mp.register_script_message("write_to_file",
-        command_writer(get_homedir().."/cpuList.dat",cpuCmd))
+        command_writer(o.datFiles_dir.."/cpuList.dat",cpuCmd))
 
     mp.register_script_message("write_to_file",
-        command_writer(get_homedir().."/gpuList.dat",gpuCmd))
+        command_writer(o.datFiles_dir.."/gpuList.dat",gpuCmd))
 end
 
 function snapshot(quickFlag)
@@ -254,7 +254,7 @@ function snapshot(quickFlag)
 
     imgCmd = imgCmd:gsub("$out", outpath)
     mp.register_script_message("write_to_file",
-        command_writer(get_homedir().."/imgList.dat",imgCmd))
+        command_writer(o.datFiles_dir.."/imgList.dat",imgCmd))
 
     emacs(outname,0)
 end
