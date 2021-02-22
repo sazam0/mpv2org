@@ -8,7 +8,7 @@ local ctx = {
     end_time = -1
 }
 local o = {
-    datFiles_dir= os.getenv("HOME").."/opt/mpvSlicingList",
+    datFiles_dir= os.getenv("HOME").."/Nextcloud/mpvSlicingList",
     quickImg_dir = os.getenv("HOME").."/Nextcloud/quickImg/",
     target_dir = "{output}/",
     vcodec = "-c:v libx264", --  -crf 35
