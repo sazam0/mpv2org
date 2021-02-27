@@ -8,14 +8,15 @@ local ctx = {
     end_time = -1
 }
 local o = {
-    datFiles_dir= os.getenv("HOME").."/Nextcloud/mpvSlicingList",
+    datFiles_dir = os.getenv("HOME").."/Nextcloud/mpvSlicingList",
     quickImg_dir = os.getenv("HOME").."/Nextcloud/quickImg/",
+    annot_file = os.getenv("HOME").."/Nextcloud/org/annotate.org",
     target_dir = "{output}/",
     vcodec = "-c:v libx264", --  -crf 35
     acodec = "-c:a copy -b:a 256k",
     bv = "-b:v 2.5M",
     opts = "-speed 2 -threads 4",
-    ext = "mp4",
+    vidExt = "mp4",
     imgExt="jpg",
     cpuCommandTemplate = [[
         ffmpeg -v warning -y -stats
@@ -39,8 +40,9 @@ local o = {
 
 local emacsParam={
     protocol="org-protocol",
-    template="ab",
-    img_template="ac",
+    vid_template="aa",
+    img_template="ab",
+    annot_template="ac",
     url="",
     title="",
     body=""
@@ -140,23 +142,32 @@ function command_writer(filename, input_string)
 end
 
 
-function emacs(outname,vidFlag)
+function emacs(outname,templateFlag)
 local ext=''
 local template=''
-local filetype=''
-if vidFlag == 1  then
-	ext = o.ext -- video file
-  filetype="mpv"
-    template=emacsParam.template
-else
+if templateFlag == 'v'  then
+	ext = o.vidExt -- video file
+  template=emacsParam.vid_template
+elseif templateFlag == 'i' then
 	ext = o.imgExt -- img file
-  filetype="img"
-    template=emacsParam.img_template
+  template=emacsParam.img_template
+else
+  template=emacsParam.annot_template
 end
 
+emacsParam.title="mpv notes"
 emacsParam.url=outname.."."..ext
-emacsParam.body=outname.."."..ext
-emacsParam.title="from anki notes"
+
+if templateFlag == 'v' then
+  local annot_file=io.open(o.annot_file,"r")
+  emacsParam.body=annot_file:read("*all")
+  annot_file:close()
+  annot_file=io.open(o.annot_file,"w")
+  annot_file:write(" ")
+  annot_file:close()
+else
+  emacsParam.body=outname.."."..ext
+end
 
 local emacsCmd=[[
     "$protocol://capture?
@@ -197,7 +208,7 @@ function cut(shift, endpos)
     cpuCmd = cpuCmd:gsub("$bv", o.bv)
     cpuCmd = cpuCmd:gsub("$opts", o.opts)
     -- Beware that input/out filename may contain replacing patterns.
-    cpuCmd = cpuCmd:gsub("$ext", o.ext)
+    cpuCmd = cpuCmd:gsub("$ext", o.vidExt)
     cpuCmd = cpuCmd:gsub("$out", outpath)
     cpuCmd = cpuCmd:gsub("$in", inpath)
 
@@ -206,14 +217,14 @@ function cut(shift, endpos)
     gpuCmd = gpuCmd:gsub("$acodec", o.acodec)
     gpuCmd = gpuCmd:gsub("$bv", o.bv)
     -- Beware that input/out filename may contain replacing patterns.
-    gpuCmd = gpuCmd:gsub("$ext", o.ext)
+    gpuCmd = gpuCmd:gsub("$ext", o.vidExt)
     gpuCmd = gpuCmd:gsub("$out", outpath)
     gpuCmd = gpuCmd:gsub("$in", inpath)
 
     msg.info(string.format("Cut fragment: %s-%s", timestamp(shift), timestamp(endpos)))
     osd(string.format("Cut fragment: %s-%s", timestamp(shift), timestamp(endpos)))
 
-    emacs(outname,1)
+    emacs(outname,'v')
     -- msg.info(cpuCmd)
     -- log(cpuCmd)
     -- print("start :: " .. shift)
@@ -256,7 +267,7 @@ function snapshot(quickFlag)
     mp.register_script_message("write_to_file",
         command_writer(o.datFiles_dir.."/imgList.dat",imgCmd))
 
-    emacs(outname,0)
+    emacs(outname,'i')
 end
 
 
@@ -306,7 +317,14 @@ function quick_snapshot()
     snapshot(true)
 end
 
+function annotate()
+msg.info("annotate")
+mp.set_property_native("pause",true)
+os.execute("wmctrl -R emacs")
+emacs("mpv annotate","a")
+end
 
+mp.add_key_binding("a", "annotate", annotate)
 mp.add_key_binding("c", "slicing_start", slicing_start)
 mp.add_key_binding("shift+c", "slicing_end", slicing_end)
 mp.add_key_binding("ctrl+c", "slicing_mark", toggle_mark)
