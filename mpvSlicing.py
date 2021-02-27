@@ -69,6 +69,15 @@ def ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList):
 
     vidThreads=[Thread(target=thrd.run, args=(cmd,)) for cmd in vidCmdList]
     imgThreads=[Thread(target=thrd.run, args=(cmd,)) for cmd in imgCmdList]
+    execFlag="-"
+    imgCounter,vidCounter=0,0
+
+    execStatus = {
+        "-": lambda: print("empty entry: no extraction"),
+        "-i": lambda: print("done: image extraction"),
+        "-v": lambda: print("done: video extraction"),
+        "-iv": lambda: print("done: image and video extraction")
+    }
 
     if(len(imgThreads)>0):
         print("processing imgaes")
@@ -76,8 +85,11 @@ def ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList):
             thread.start()
         for thread in imgThreads:
             thread.join()
-    else:
-        print("no image to process in '{img}'".format(img=cmdList['img']))
+            imgCounter+=1
+        if(imgCounter==len(imgThreads)):
+            execFlag+="i"
+    # else:
+    #     print("no image to process in '{img}'".format(img=cmdList['img']))
 
     if(len(vidThreads)>0):
         print("processing videos")
@@ -85,16 +97,18 @@ def ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList):
             thread.start()
         for thread in vidThreads:
             thread.join()
-    else:
-        print("no video to process in '{selectedFile}'"
-            .format(selectedFile="{gpu}"
-                .format(gpu=cmdList['gpu']) if gpu else "{cpu}".format(cpu=cmdList['cpu'])))
+            vidCounter+=1
+        if(vidCounter==len(vidThreads)):
+            execFlag+="v"
+    # else:
+    #     print("no video to process in '{selectedFile}'"
+    #         .format(selectedFile=cmdList['gpu'] if gpu else cmdList['cpu']))
 
-    print("All done")
+    execStatus[execFlag]()
 
-    return 0
+    return execFlag
 
-def clearCmd(thrd,fileDir,cmdList,archFile):
+def clearCmd(thrd,fileDir,execList,archFile,execFlag):
 
     ipTemplate=re.compile("\-i\s.*mp4\s-")
     opTemplate=re.compile("\s/home/.*(?:mp4|jpg|png)")
@@ -109,11 +123,12 @@ def clearCmd(thrd,fileDir,cmdList,archFile):
     fileIO(fromFile=fileDir+"/{arch}".format(arch=archFile),mode='a',
         txt=log+'\n'.join(map(relativePath,thrd.executedList())))
 
-    print("cleaning 'mpv' generated files :: '{cmdList}'"
-        .format(cmdList=', '.join(list(cmdList.values()))))
+    if(len(execList)>0):
+        print("cleaning 'mpv' generated files :: '{execList}'"
+        .format(execList=', '.join(execList)))
 
     _=list(map(partial(fileIO,mode='w',txt=''),
-            [fileDir+'/'+i for i in list(cmdList.values())]))
+            [fileDir+'/'+i for i in execList]))
 
     return 0
 
@@ -121,6 +136,8 @@ def clearCmd(thrd,fileDir,cmdList,archFile):
 def formatCmd(cmdTxt, ipDir, opDir):
     ipDirFlag=cmdTxt.find("{input}") != -1
     opDirFlag=cmdTxt.find("{output}") != -1
+
+    print("following commands to be executed: ")
 
     if(ipDirFlag and opDirFlag):
         print("'input' and 'output' directory not assigned in 'ffmpeg' command, setting\n"\
@@ -175,7 +192,6 @@ def initialize(gpu,nthreads,fileDir,ipDir,opDir,cmdList,archFile,archCmd):
         tmpVidCmd=fileIO(fromFile='/'.join([fileDir,fromVidFile]),mode='r',txt='')
         tmpImgCmd=fileIO(fromFile='/'.join([fileDir,fromImgFile]),mode='r',txt='')
 
-    print("following commands to be executed: ")
     partialFormatCmd=partial(formatCmd,ipDir=formatDir(ipDir),opDir=formatDir(opDir))
 
     vidCmdList=list(map(partialFormatCmd,tmpVidCmd))
@@ -262,6 +278,13 @@ def main():
     "img":"imgList.dat"
     }
 
+    execList={
+    "-":[],
+    "i":[cmdList["img"]],
+    "v":[cmdList["cpu"],cmdList["gpu"]],
+    "iv":[cmdList["img"],cmdList["cpu"],cmdList["gpu"]]
+    }
+
     archFile="log/archieve.log"
 
     inputs=parseArgs(cmdList)
@@ -272,8 +295,8 @@ def main():
         archFile=archFile,archCmd=inputs.arch)
 
     thrd=MyThread(nthreads)
-    ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList)
-    clearCmd(thrd,fileDir,cmdList,archFile)
+    execFlag=ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList)
+    clearCmd(thrd,fileDir,execList[execFlag],archFile,execFlag)
 
     toc=time.perf_counter()
     # convert seconds to minutes
