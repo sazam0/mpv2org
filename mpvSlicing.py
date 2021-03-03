@@ -279,10 +279,9 @@ def main():
     }
 
     execList={
-    "-":[],
-    "i":[cmdList["img"]],
-    "v":[cmdList["cpu"],cmdList["gpu"]],
-    "iv":[cmdList["img"],cmdList["cpu"],cmdList["gpu"]]
+    "-i":[cmdList["img"]],
+    "-v":[cmdList["cpu"],cmdList["gpu"]],
+    "-iv":[cmdList["img"],cmdList["cpu"],cmdList["gpu"]]
     }
 
     archFile="log/archieve.log"
@@ -296,7 +295,8 @@ def main():
 
     thrd=MyThread(nthreads)
     execFlag=ffmpegExec(gpu,thrd,vidCmdList,imgCmdList,cmdList)
-    clearCmd(thrd,fileDir,execList[execFlag],archFile,execFlag)
+    if(execFlag != "-"):
+        clearCmd(thrd,fileDir,execList[execFlag],archFile,execFlag)
 
     toc=time.perf_counter()
     # convert seconds to minutes
