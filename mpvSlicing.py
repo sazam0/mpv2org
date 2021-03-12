@@ -158,12 +158,18 @@ def formatCmd(cmdTxt, ipDir, opDir):
     print(cmdTxt)
     return cmdTxt
 
-
 def formatDir(txt):
     if(txt.startswith("~/")):
         txt='/'.join([str(Path.home()),txt[2:]])
     elif(txt.startswith('./')):
         txt='/'.join([str(Path.cwd()),txt[2:]])
+    elif(txt.startswith("/home/")):
+        # update the user name to current user,
+        # useful for generating cmds in 1 pc and executing on another pc
+        # file structure with respcet to home directory should be same on both pc
+        txt=txt.split("/")
+        txt[2]=str(Path.home()).split("/")[-1]
+        txt='/'.join(txt)
     else:
         pass
 
